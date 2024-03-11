@@ -25,6 +25,9 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
+
+	type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
+
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
@@ -34,22 +37,29 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 	}
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/main-docs/build/runtime-storage/
+	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo, PartialOrd, Default)]
+	pub enum CoinSide {
+		#[default]
+		Head,
+		Tail,
+	}
+
+	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo, PartialOrd, Default)]
+	pub struct Coin {
+		side: CoinSide,
+	}
+
 	#[pallet::storage]
 	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	pub type CoinStorage<T> = StorageMap<_, Blake2_128Concat, AccountIdOf<T>, Coin, OptionQuery>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/main-docs/build/events-errors/
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
+		/// A new coin has been created
+		CoinCreated(T::AccountId, Coin),
 	}
 
-	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
 	}
@@ -58,7 +68,13 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::default_weight())]
-		pub fn do_something(_origin: OriginFor<T>) -> DispatchResult {
+		pub fn create_coin(origin: OriginFor<T>) -> DispatchResult {
+			let _who = ensure_signed(origin)?;
+			let coin = Coin {
+				side: CoinSide::Head,
+			};
+			CoinStorage::<T>::insert(&_who, coin.clone());
+			Self::deposit_event(Event::CoinCreated(_who, coin));
 			Ok(())
 		}
 
