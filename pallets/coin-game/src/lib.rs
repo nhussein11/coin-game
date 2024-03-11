@@ -65,7 +65,9 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// A new coin has been created
-		CoinCreated(T::AccountId),
+		CoinCreated(AccountIdOf<T>),
+		/// Coin has been Flipped
+		CoinFlipped(AccountIdOf<T>, CoinSide),
 	}
 
 	#[pallet::error]
@@ -80,7 +82,7 @@ pub mod pallet {
 		#[pallet::weight(T::WeightInfo::default_weight())]
 		pub fn create_coin(origin: OriginFor<T>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			let _  = Self::do_create_coin(&who);
+			Self::do_create_coin(&who)?;
 			Self::deposit_event(Event::CoinCreated(who));
 			Ok(())
 		}
@@ -97,6 +99,7 @@ pub mod pallet {
 			}
 
 			CoinStorage::<T>::insert(who, coin);
+
 
 			Ok(())
 		}
