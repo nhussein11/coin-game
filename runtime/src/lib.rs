@@ -46,8 +46,11 @@ use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
-/// Import the template pallet.
+/// Import the pallet coin game
 pub use pallet_coin_game;
+
+use frame_support::PalletId;
+pub use pallet_insecure_randomness_collective_flip;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -253,6 +256,10 @@ parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
 }
 
+parameter_types! {
+	pub const CoinFlipperPalletId: PalletId = PalletId(*b"coinflip");
+}
+
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
@@ -268,10 +275,14 @@ impl pallet_sudo::Config for Runtime {
 	type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
 }
 
+impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
+
 /// Configure the pallet-template in pallets/template.
 impl pallet_coin_game::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_coin_game::weights::SubstrateWeight<Runtime>;
+	type PalletId = CoinFlipperPalletId;
+	type MyRandomness = RandomnessCollectiveFlip;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -285,6 +296,7 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
 		CoinGame: pallet_coin_game,
+		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
 	}
 );
 
