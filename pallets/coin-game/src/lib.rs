@@ -116,7 +116,8 @@ pub mod pallet {
 		// TODO: check for safer alternatives to generate random numbers in this env
 		// You should call this function with different seed values, in this case I'm are using the block number as seed
 		pub fn generate_insecure_random_boolean(seed: u32) -> bool {
-			let (random_seed, _) = T::MyRandomness::random(&(T::PalletId::get(), seed).encode());
+			let pallet_id = T::PalletId::get();
+			let (random_seed, _) = T::MyRandomness::random(&(pallet_id, seed).encode());
 			let random_number = <u32>::decode(&mut random_seed.as_ref())
 				.expect("secure hashes should always be bigger than u32; qed");
 			random_number % 2 == 0
