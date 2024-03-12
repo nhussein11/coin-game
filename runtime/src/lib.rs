@@ -282,7 +282,7 @@ impl pallet_coin_game::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_coin_game::weights::SubstrateWeight<Runtime>;
 	type PalletId = CoinFlipperPalletId;
-	type MyRandomness = RandomnessCollectiveFlip;
+	type Randomness = RandomnessCollectiveFlip;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

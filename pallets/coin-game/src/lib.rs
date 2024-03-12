@@ -42,7 +42,7 @@ pub mod pallet {
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
 		/// Type representing the random number generator
-		type MyRandomness: Randomness<Self::Hash, BlockNumberFor<Self>>;
+		type Randomness: Randomness<Self::Hash, BlockNumberFor<Self>>;
 	}
 
 	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo, PartialOrd, Default)]
@@ -68,12 +68,20 @@ pub mod pallet {
 		CoinCreated(AccountIdOf<T>),
 		/// Coin has been Flipped
 		CoinFlipped(AccountIdOf<T>, CoinSide),
+		/// Coin side guessed
+		CoinGuessed(AccountIdOf<T>, CoinSide),
+		/// Coin side not guessed
+		CoinNotGuessed(AccountIdOf<T>, CoinSide),
+		/// Coin has been removed
+		CoinRemoved(AccountIdOf<T>),
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
 		/// Coin already exists
 		CoinAlreadyExists,
+		/// Coin not found
+		CoinNotFound,
 	}
 
 	#[pallet::call]
@@ -84,6 +92,44 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			Self::do_create_coin(&who)?;
 			Self::deposit_event(Event::CoinCreated(who));
+			Ok(())
+		}
+
+		#[pallet::call_index(1)]
+		#[pallet::weight(T::WeightInfo::default_weight())]
+		pub fn toss_coin(origin: OriginFor<T>, coin_side: CoinSide) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let coin = CoinStorage::<T>::get(&who).ok_or(Error::<T>::CoinNotFound)?;
+
+			let toss_result = Self::random_coin_side();
+
+			if coin_side == toss_result {
+				Self::deposit_event(Event::CoinGuessed(who.clone(), toss_result.clone()));
+			}else {
+				Self::deposit_event(Event::CoinNotGuessed(who.clone(), toss_result.clone()));
+			}
+
+			if coin.side != toss_result.clone() {
+				CoinStorage::<T>::set(&who, Some(Coin {
+					side: toss_result.clone(),
+				}));
+				Self::deposit_event(Event::CoinFlipped(who, toss_result));
+			}
+
+			Ok(())
+		}
+
+		#[pallet::call_index(2)]
+		#[pallet::weight(T::WeightInfo::default_weight())]
+		pub fn remove_coin(origin: OriginFor<T>) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+
+			if !CoinStorage::<T>::contains_key(&who) {
+				return Err(Error::<T>::CoinNotFound.into());
+			}
+
+			CoinStorage::<T>::remove(&who);
+			Self::deposit_event(Event::CoinRemoved(who));
 			Ok(())
 		}
 	}
@@ -120,7 +166,7 @@ pub mod pallet {
 		// You should call this function with different seed values, in this case I'm are using the block number as seed
 		pub fn generate_insecure_random_boolean(seed: u32) -> bool {
 			let pallet_id = T::PalletId::get();
-			let (random_seed, _) = T::MyRandomness::random(&(pallet_id, seed).encode());
+			let (random_seed, _) = T::Randomness::random(&(pallet_id, seed).encode());
 			let random_number = <u32>::decode(&mut random_seed.as_ref())
 				.expect("secure hashes should always be bigger than u32; qed");
 			random_number % 2 == 0
