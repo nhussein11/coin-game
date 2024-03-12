@@ -99,7 +99,8 @@ pub mod pallet {
 		#[pallet::weight(T::WeightInfo::default_weight())]
 		pub fn toss_coin(origin: OriginFor<T>, coin_side: CoinSide) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			let coin = CoinStorage::<T>::get(&who).ok_or(Error::<T>::CoinNotFound)?;
+
+			let coin = Self::get_coin(&who).ok_or(Error::<T>::CoinNotFound)?;
 
 			let toss_result = Self::random_coin_side();
 
@@ -123,12 +124,7 @@ pub mod pallet {
 		#[pallet::weight(T::WeightInfo::default_weight())]
 		pub fn remove_coin(origin: OriginFor<T>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-
-			if !CoinStorage::<T>::contains_key(&who) {
-				return Err(Error::<T>::CoinNotFound.into());
-			}
-
-			CoinStorage::<T>::remove(&who);
+			Self::do_remove_coin(&who)?;
 			Self::deposit_event(Event::CoinRemoved(who));
 			Ok(())
 		}
@@ -136,17 +132,24 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T> {
 		pub fn do_create_coin(who: &T::AccountId) -> DispatchResult {
-			let coin = Coin {
-				side: Self::random_coin_side(),
-			};
+			let side = Self::random_coin_side();
+			let coin = Coin { side };
 
-			if CoinStorage::<T>::contains_key(who) {
+			if Self::get_coin(who).is_some() {
 				return Err(Error::<T>::CoinAlreadyExists.into());
 			}
 
 			CoinStorage::<T>::insert(who, coin);
 
+			Ok(())
+		}
 
+		pub fn do_remove_coin(who: &T::AccountId) -> DispatchResult {
+			if Self::get_coin(who).is_none() {
+				return Err(Error::<T>::CoinNotFound.into());
+			}
+
+			CoinStorage::<T>::remove(who);
 			Ok(())
 		}
 
@@ -159,6 +162,10 @@ pub mod pallet {
 			} else {
 				CoinSide::Tail
 			}
+		}
+
+		pub fn get_coin(who: &T::AccountId) -> Option<Coin> {
+			CoinStorage::<T>::get(who)
 		}
 
 
