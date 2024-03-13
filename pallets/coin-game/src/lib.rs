@@ -21,13 +21,13 @@ pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
+	use frame_support::BoundedBTreeMap;
 
 	use frame_support::PalletId;
 	use frame_support::traits::Randomness;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
-
 
 	type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
@@ -59,7 +59,8 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn something)]
-	pub type CoinStorage<T> = StorageMap<_, Blake2_128Concat, AccountIdOf<T>, Coin, OptionQuery>;
+	// pub type CoinStorage<T> = StorageMap<_, Blake2_128Concat, AccountIdOf<T>, Coin, OptionQuery>;
+	pub type CoinStorage<T> = StorageValue<_, BoundedBTreeMap<AccountIdOf<T>, Coin, ConstU32<32>>, OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -100,20 +101,20 @@ pub mod pallet {
 		pub fn toss_coin(origin: OriginFor<T>, coin_side: CoinSide) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			let coin = Self::get_coin(&who).ok_or(Error::<T>::CoinNotFound)?;
+			let coin = Self::get_coin(&who)?;
 
 			let toss_result = Self::random_coin_side();
 
 			if coin_side == toss_result {
 				Self::deposit_event(Event::CoinGuessed(who.clone(), toss_result.clone()));
-			}else {
+			} else {
 				Self::deposit_event(Event::CoinNotGuessed(who.clone(), toss_result.clone()));
 			}
 
 			if coin.side != toss_result.clone() {
-				CoinStorage::<T>::set(&who, Some(Coin {
+				Self::mutate_coin(&who, Coin {
 					side: toss_result.clone(),
-				}));
+				});
 				Self::deposit_event(Event::CoinFlipped(who, toss_result));
 			}
 
@@ -135,21 +136,22 @@ pub mod pallet {
 			let side = Self::random_coin_side();
 			let coin = Coin { side };
 
-			if Self::get_coin(who).is_some() {
+			if Self::get_coin(who).is_ok() {
 				return Err(Error::<T>::CoinAlreadyExists.into());
 			}
 
-			CoinStorage::<T>::insert(who, coin);
+			Self::insert_coin(who, coin);
 
 			Ok(())
 		}
 
 		pub fn do_remove_coin(who: &T::AccountId) -> DispatchResult {
-			if Self::get_coin(who).is_none() {
+			if Self::get_coin(who).is_err() {
 				return Err(Error::<T>::CoinNotFound.into());
 			}
 
-			CoinStorage::<T>::remove(who);
+			Self::delete_coin(&who);
+
 			Ok(())
 		}
 
@@ -164,8 +166,38 @@ pub mod pallet {
 			}
 		}
 
-		pub fn get_coin(who: &T::AccountId) -> Option<Coin> {
-			CoinStorage::<T>::get(who)
+		pub fn insert_coin(who: &T::AccountId, coin: Coin) {
+			let bounded_btree = CoinStorage::<T>::get();
+			if let Some(mut map) = bounded_btree {
+				let _ = map.try_insert(who.clone(), coin);
+			}
+		}
+
+		pub fn mutate_coin(who: &T::AccountId, coin: Coin) {
+			let bounded_btree = CoinStorage::<T>::get();
+			if let Some(mut map) = bounded_btree {
+				let _ = map.get_mut(who).map(|c| *c = coin);
+			}
+		}
+
+		pub fn delete_coin(who: &T::AccountId) {
+			let bounded_btree = CoinStorage::<T>::get();
+			if let Some(mut map) = bounded_btree {
+				let _ = map.remove(who);
+			}
+		}
+
+		pub fn get_coin(who: &T::AccountId) ->  Result<Coin, Error<T>> {
+			let bounded_btree = CoinStorage::<T>::get();
+			if let Some(map) = bounded_btree {
+				if let Some(coin) = map.get(who) {
+					Ok(coin.clone())
+				} else {
+					Err(Error::<T>::CoinNotFound)
+				}
+			} else {
+				Err(Error::<T>::CoinNotFound)
+			}
 		}
 
 
