@@ -57,10 +57,11 @@ pub mod pallet {
 		side: CoinSide,
 	}
 
+	const COIN_STORAGE_LIMIT: u32 = 10;
+
 	#[pallet::storage]
 	#[pallet::getter(fn something)]
-	// pub type CoinStorage<T> = StorageMap<_, Blake2_128Concat, AccountIdOf<T>, Coin, OptionQuery>;
-	pub type CoinStorage<T> = StorageValue<_, BoundedBTreeMap<AccountIdOf<T>, Coin, ConstU32<32>>, OptionQuery>;
+	pub type CoinStorage<T> = StorageValue<_, BoundedBTreeMap<AccountIdOf<T>, Coin, ConstU32<COIN_STORAGE_LIMIT>>, OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -170,6 +171,10 @@ pub mod pallet {
 			let bounded_btree = CoinStorage::<T>::get();
 			if let Some(mut map) = bounded_btree {
 				let _ = map.try_insert(who.clone(), coin);
+			} else {
+				let mut map = BoundedBTreeMap::<AccountIdOf<T>, Coin, ConstU32<COIN_STORAGE_LIMIT>>::new();
+				let _ = map.try_insert(who.clone(), coin);
+				let _ = CoinStorage::<T>::set(Some(map));
 			}
 		}
 
