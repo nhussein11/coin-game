@@ -45,16 +45,15 @@ pub mod pallet {
 		type Randomness: Randomness<Self::Hash, BlockNumberFor<Self>>;
 	}
 
-	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo, PartialOrd, Default)]
+	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo, PartialOrd)]
 	pub enum CoinSide {
-		#[default]
 		Head,
 		Tail,
 	}
 
-	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo, PartialOrd, Default)]
+	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo, PartialOrd)]
 	pub struct Coin {
-		side: CoinSide,
+		pub side: CoinSide,
 	}
 
 	const COIN_STORAGE_LIMIT: u32 = 10;
@@ -78,6 +77,7 @@ pub mod pallet {
 		CoinRemoved(AccountIdOf<T>),
 	}
 
+	#[derive(PartialEq)]
 	#[pallet::error]
 	pub enum Error<T> {
 		/// Coin already exists
